@@ -308,6 +308,40 @@ namespace Agent.Generator
 
                                     builder.AppendLine();
 
+                                    // ==
+                                    builder.AppendFormat(
+                                        "{0}public static bool operator ==({1} lhs, {1} rhs) {{ return",
+                                        immutableGeneratedTrivia.whiteSpace,
+                                        className);
+
+                                    var conditionBuilder = new List<string>(fields.Count);
+                                    foreach (var field in fields)
+                                        conditionBuilder.Add(string.Format(
+                                            " lhs.{0} == rhs.{0} ",
+                                            field.Name));
+
+                                    builder.Append(string.Join("&&", conditionBuilder.ToArray()));
+                                    builder.Append("; }");
+
+                                    builder.AppendLine();
+
+                                    // !=
+                                    builder.AppendFormat(
+                                        "{0}public static bool operator !=({1} lhs, {1} rhs) {{ return",
+                                        immutableGeneratedTrivia.whiteSpace,
+                                        className);
+
+                                    conditionBuilder = new List<string>(fields.Count);
+                                    foreach (var field in fields)
+                                        conditionBuilder.Add(string.Format(
+                                            " lhs.{0} != rhs.{0} ",
+                                            field.Name));
+
+                                    builder.Append(string.Join("||", conditionBuilder.ToArray()));
+                                    builder.Append("; }");
+
+                                    builder.AppendLine();
+
                                     updateRegion.newText = builder.ToString();
                                 }
                                 else

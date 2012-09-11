@@ -31,6 +31,8 @@ namespace TestClasses
         public class Mutable { public int IntVal { get; set; } public long LongVal { get; set; } public string StringVal { get; set; } public Simple ToImmutable() { return new Simple(this.IntVal, this.LongVal, this.StringVal);} }
         public Mutable ToMutable() { return new Mutable() { IntVal = this.intVal, LongVal = this.longVal, StringVal = this.stringVal}; }
 
+        public static bool operator ==(Simple lhs, Simple rhs) { return lhs.intVal == rhs.intVal && lhs.longVal == rhs.longVal && lhs.stringVal == rhs.stringVal ; }
+        public static bool operator !=(Simple lhs, Simple rhs) { return lhs.intVal != rhs.intVal || lhs.longVal != rhs.longVal || lhs.stringVal != rhs.stringVal ; }
         #endregion
 
         public static void TestConventions()
