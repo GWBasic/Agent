@@ -7,7 +7,7 @@ mutable version of the class, from readonly fields
 
 TODOs:
 Operators: == and !=
-collections
+collections and dictionaries
 deep mutables
 
 unit test

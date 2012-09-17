@@ -134,30 +134,27 @@ namespace Agent.Generator
                                                 .FirstOrDefault() as IFieldSymbol;
 
                                             // Verify it
-                                            if (null == field)
-                                                throw new Exception(string.Format(
-                                                    "{0} must be a readonly field",
-                                                    identifier));
+                                            if (null != field)
+                                            {
+                                                if (field.IsStatic)
+                                                    throw new Exception(string.Format(
+                                                        "Can not wrap static fields: {0}",
+                                                        identifier));
 
-                                            if (field.IsStatic)
-                                                throw new Exception(string.Format(
-                                                    "Can not wrap static fields: {0}",
-                                                    identifier));
+                                                if (!field.IsReadOnly)
+                                                    throw new Exception(string.Format(
+                                                        "Exposed fields must be readonly: {0}",
+                                                        identifier));
 
-                                            if (!field.IsReadOnly)
-                                                throw new Exception(string.Format(
-                                                    "Exposed fields must be readonly: {0}",
-                                                    identifier));
+                                                if (field.HasConstantValue)
+                                                    throw new Exception(string.Format(
+                                                        "Exposed fields not be constant: {0}",
+                                                        identifier));
 
-                                            if (field.HasConstantValue)
-                                                throw new Exception(string.Format(
-                                                    "Exposed fields not be constant: {0}",
-                                                    identifier));
+                                                // TODO: Need to verify that the field is private
 
-                                            // TODO: Need to verify that the field is private
-                                            //if (field.
-
-                                            fields.Add(field);
+                                                fields.Add(field);
+                                            }
                                         }
 
                                         token = token.GetNextToken();
@@ -261,7 +258,15 @@ namespace Agent.Generator
 
                                     foreach (var field in fields)
                                     {
-                                        builder.AppendFormat("this.{0} = {0}; ", field.Name);
+                                        var typeDisplayString = field.Type.ToDisplayString();
+                                        if (typeDisplayString.StartsWith("IEnumerable<") || typeDisplayString.Contains(".IEnumerable<"))
+                                        {
+                                            builder.AppendFormat("if (default({1}) != {0}) this.{0} = {0}.ToArray().AsEnumerable(); ", field.Name, typeDisplayString);
+                                        }
+                                        else
+                                        {
+                                            builder.AppendFormat("this.{0} = {0}; ", field.Name);
+                                        }
                                     }
 
                                     builder.AppendLine("}");
@@ -272,10 +277,18 @@ namespace Agent.Generator
                                     builder.Append("public class Mutable {");
 
                                     foreach (var field in fields)
+                                    {
+                                        var typeDisplayString = field.Type.ToDisplayString();
+                                        if (typeDisplayString.StartsWith("IEnumerable<") || typeDisplayString.Contains(".IEnumerable<"))
+                                        {
+                                            typeDisplayString = typeDisplayString.Replace("IEnumerable", "IList");
+                                        }
+
                                         builder.AppendFormat(
                                             " public {0} {1} {{ get; set; }}",
-                                            field.Type.ToDisplayString(),
+                                            typeDisplayString,
                                             propertyNames[field]);
+                                    }
 
                                     // Generate immutable from mutable
                                     builder.AppendFormat(
@@ -298,10 +311,20 @@ namespace Agent.Generator
 
                                     assignments = new List<string>(fields.Count);
                                     foreach (var field in fields)
+                                    {
+                                        var copyMethod = String.Empty;
+                                        var typeDisplayString = field.Type.ToDisplayString();
+                                        if (typeDisplayString.StartsWith("IEnumerable<") || typeDisplayString.Contains(".IEnumerable<"))
+                                        {
+                                            copyMethod = ".ToList()";
+                                        }
+
                                         assignments.Add(string.Format(
-                                            "{0} = this.{1}",
+                                            "{0} = this.{1}{2}",
                                             propertyNames[field],
-                                            field.Name));
+                                            field.Name,
+                                            copyMethod));
+                                    }
 
                                     builder.Append(string.Join(", ", assignments.ToArray()));
                                     builder.AppendLine("}; }");
@@ -316,9 +339,21 @@ namespace Agent.Generator
 
                                     var conditionBuilder = new List<string>(fields.Count);
                                     foreach (var field in fields)
-                                        conditionBuilder.Add(string.Format(
-                                            " lhs.{0} == rhs.{0} ",
-                                            field.Name));
+                                    {
+                                        var typeDisplayString = field.Type.ToDisplayString();
+                                        if (typeDisplayString.StartsWith("IEnumerable<") || typeDisplayString.Contains(".IEnumerable<"))
+                                        {
+                                            conditionBuilder.Add(string.Format(
+                                                " lhs.{0}.SequenceEqual(rhs.{0})",
+                                                field.Name));
+                                        }
+                                        else
+                                        {
+                                            conditionBuilder.Add(string.Format(
+                                                " lhs.{0} == rhs.{0} ",
+                                                field.Name));
+                                        }
+                                    }
 
                                     builder.Append(string.Join("&&", conditionBuilder.ToArray()));
                                     builder.Append("; }");
@@ -333,9 +368,21 @@ namespace Agent.Generator
 
                                     conditionBuilder = new List<string>(fields.Count);
                                     foreach (var field in fields)
-                                        conditionBuilder.Add(string.Format(
-                                            " lhs.{0} != rhs.{0} ",
-                                            field.Name));
+                                    {
+                                        var typeDisplayString = field.Type.ToDisplayString();
+                                        if (typeDisplayString.StartsWith("IEnumerable<") || typeDisplayString.Contains(".IEnumerable<"))
+                                        {
+                                            conditionBuilder.Add(string.Format(
+                                                " (!lhs.{0}.SequenceEqual(rhs.{0}))",
+                                                field.Name));
+                                        }
+                                        else
+                                        {
+                                            conditionBuilder.Add(string.Format(
+                                                " lhs.{0} != rhs.{0} ",
+                                                field.Name));
+                                        }
+                                    }
 
                                     builder.Append(string.Join("||", conditionBuilder.ToArray()));
                                     builder.Append("; }");
