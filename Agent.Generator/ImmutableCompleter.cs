@@ -46,7 +46,7 @@ namespace Agent.Generator
                     syntaxTrees.Add(document.GetSyntaxTree());
 
             var commonCompilation = compilation.AddSyntaxTrees(syntaxTrees);
-            
+
             foreach (var project in this.Solution.Projects)
             {
                 Console.WriteLine("\tIterating through {0}", project.Name);
@@ -171,7 +171,7 @@ namespace Agent.Generator
                                     foreach (var field in fields)
                                     {
                                         var type = field.Type.ToDisplayString();
-                                        
+
                                         // Determine property name
                                         string propertyName;
                                         if (field.Name.StartsWith("_"))
@@ -259,7 +259,7 @@ namespace Agent.Generator
                                     foreach (var field in fields)
                                     {
                                         var typeDisplayString = field.Type.ToDisplayString();
-                                        if (typeDisplayString.StartsWith("IEnumerable<") || typeDisplayString.Contains(".IEnumerable<"))
+                                        if (this.IsIEnumerable(typeDisplayString))
                                         {
                                             builder.AppendFormat("if (default({1}) != {0}) this.{0} = {0}.ToArray().AsEnumerable(); ", field.Name, typeDisplayString);
                                         }
@@ -279,7 +279,7 @@ namespace Agent.Generator
                                     foreach (var field in fields)
                                     {
                                         var typeDisplayString = field.Type.ToDisplayString();
-                                        if (typeDisplayString.StartsWith("IEnumerable<") || typeDisplayString.Contains(".IEnumerable<"))
+                                        if (this.IsIEnumerable(typeDisplayString))
                                         {
                                             typeDisplayString = typeDisplayString.Replace("IEnumerable", "IList");
                                         }
@@ -314,7 +314,7 @@ namespace Agent.Generator
                                     {
                                         var copyMethod = String.Empty;
                                         var typeDisplayString = field.Type.ToDisplayString();
-                                        if (typeDisplayString.StartsWith("IEnumerable<") || typeDisplayString.Contains(".IEnumerable<"))
+                                        if (this.IsIEnumerable(typeDisplayString))
                                         {
                                             copyMethod = ".ToList()";
                                         }
@@ -341,7 +341,7 @@ namespace Agent.Generator
                                     foreach (var field in fields)
                                     {
                                         var typeDisplayString = field.Type.ToDisplayString();
-                                        if (typeDisplayString.StartsWith("IEnumerable<") || typeDisplayString.Contains(".IEnumerable<"))
+                                        if (this.IsIEnumerable(typeDisplayString))
                                         {
                                             conditionBuilder.Add(string.Format(
                                                 " lhs.{0}.SequenceEqual(rhs.{0})",
@@ -370,7 +370,7 @@ namespace Agent.Generator
                                     foreach (var field in fields)
                                     {
                                         var typeDisplayString = field.Type.ToDisplayString();
-                                        if (typeDisplayString.StartsWith("IEnumerable<") || typeDisplayString.Contains(".IEnumerable<"))
+                                        if (this.IsIEnumerable(typeDisplayString))
                                         {
                                             conditionBuilder.Add(string.Format(
                                                 " (!lhs.{0}.SequenceEqual(rhs.{0}))",
@@ -425,46 +425,46 @@ namespace Agent.Generator
         private BeginEndRegionTrivia GetRegion(ClassDeclarationSyntax classDeclaration, string name)
         {
             using (var triviaEnumerator = classDeclaration.DescendantTrivia().GetEnumerator())
-            while (triviaEnumerator.MoveNext())
-            {
-                var beginRegionTrivia = triviaEnumerator.Current;
-
-                if (SyntaxKind.RegionDirective == beginRegionTrivia.Kind)
+                while (triviaEnumerator.MoveNext())
                 {
-                    var text = beginRegionTrivia.GetText().Trim();
+                    var beginRegionTrivia = triviaEnumerator.Current;
 
-                    if (text.Trim().EndsWith(name))
+                    if (SyntaxKind.RegionDirective == beginRegionTrivia.Kind)
                     {
-                        // The #region is found, now looking for the matching #endregion
-                        var prev = beginRegionTrivia;
-                        var depth = 0;
-                        while (triviaEnumerator.MoveNext())
+                        var text = beginRegionTrivia.GetText().Trim();
+
+                        if (text.Trim().EndsWith(name))
                         {
-                            var endRegionTrivia = triviaEnumerator.Current;
-
-                            // Handle nested #regions...
-                            if (SyntaxKind.RegionDirective == endRegionTrivia.Kind)
+                            // The #region is found, now looking for the matching #endregion
+                            var prev = beginRegionTrivia;
+                            var depth = 0;
+                            while (triviaEnumerator.MoveNext())
                             {
-                                depth++;
-                            }
-                            else if (SyntaxKind.EndRegionDirective == endRegionTrivia.Kind)
-                            {
-                                if (0 == depth)
-                                    return new BeginEndRegionTrivia()
-                                    {
-                                        beginRegionTrivia = beginRegionTrivia,
-                                        endRegionTrivia = prev, // this places the text within the whitespace
-                                        whiteSpace = prev.GetText()
-                                    };
-                                else
-                                    depth--;
-                            }
+                                var endRegionTrivia = triviaEnumerator.Current;
 
-                            prev = endRegionTrivia;
+                                // Handle nested #regions...
+                                if (SyntaxKind.RegionDirective == endRegionTrivia.Kind)
+                                {
+                                    depth++;
+                                }
+                                else if (SyntaxKind.EndRegionDirective == endRegionTrivia.Kind)
+                                {
+                                    if (0 == depth)
+                                        return new BeginEndRegionTrivia()
+                                        {
+                                            beginRegionTrivia = beginRegionTrivia,
+                                            endRegionTrivia = prev, // this places the text within the whitespace
+                                            whiteSpace = prev.GetText()
+                                        };
+                                    else
+                                        depth--;
+                                }
+
+                                prev = endRegionTrivia;
+                            }
                         }
                     }
                 }
-            }
 
             // No matching #region and #endregion found
             return null;
@@ -519,7 +519,12 @@ namespace Agent.Generator
             this.solution = this.solution.UpdateDocument(document.Id, recompiled.GetRoot());
 
             this.Update(document, newText);
-       }
+        }
+
+        private bool IsIEnumerable(string typeDisplayString)
+        {
+            return typeDisplayString.StartsWith("IEnumerable<") || typeDisplayString.Contains(".IEnumerable<");
+        }
 
         protected abstract void Update(IDocument document, string newText);
     }
